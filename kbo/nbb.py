@@ -45,9 +45,12 @@ MIN_YEAR = config.NBB_MIN_YEAR
 _PAGE_SIZE = 100
 _MAX_PAGES = 50  # garde-fou
 
+# Backoff sur 429 : on respecte le signal du serveur en ralentissant avant de réessayer.
+_RETRY_BACKOFFS = (30, 60, 90, 120)  # secondes
+
 
 class RateLimited(Exception):
-    """HTTP 429 renvoyé par le service de consultation."""
+    """HTTP 429 persistant malgré les temporisations."""
 
 
 def _clean_num(enterprise_number: str) -> str:
@@ -55,14 +58,24 @@ def _clean_num(enterprise_number: str) -> str:
 
 
 def _get(session: requests.Session, url: str, accept: str = "application/json") -> requests.Response | None:
-    """GET avec détection du rate limit. Renvoie None sur erreur réseau/4xx-5xx."""
-    try:
-        response = session.get(url, timeout=30, headers={**BROWSER_HEADERS, "Accept": accept})
-    except requests.RequestException as exc:
-        print(f"    Erreur réseau: {exc}")
-        return None
-    if response.status_code == 429:
-        raise RateLimited(url)
+    """GET poli : sur 429, attend (Retry-After ou backoff) puis réessaie.
+
+    Renvoie None sur erreur réseau/4xx-5xx. Lève RateLimited si le 429 persiste
+    après toutes les temporisations (le scraping s'arrête alors proprement)."""
+    for attempt in range(len(_RETRY_BACKOFFS) + 1):
+        try:
+            response = session.get(url, timeout=30, headers={**BROWSER_HEADERS, "Accept": accept})
+        except requests.RequestException as exc:
+            print(f"    Erreur réseau: {exc}")
+            return None
+        if response.status_code != 429:
+            break
+        if attempt == len(_RETRY_BACKOFFS):
+            raise RateLimited(url)
+        retry_after = response.headers.get("Retry-After")
+        wait = int(retry_after) if (retry_after or "").isdigit() else _RETRY_BACKOFFS[attempt]
+        print(f"    [429] rate limit — pause {wait}s puis réessai ({attempt + 1}/{len(_RETRY_BACKOFFS)})")
+        time.sleep(wait)
     if response.status_code >= 400:
         return None
     return response
