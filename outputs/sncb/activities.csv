@@ -1,0 +1,6 @@
+EntityNumber,ActivityGroup,NaceVersion,NaceCode,Classification,ActivityGroup_libelle,NaceVersion_libelle,NaceCode_libelle
+0203.430.576,001,2025,80010,SECO,Activités TVA,2025,Activités d’investigation et de sécurité privée
+0203.430.576,001,2025,49110,MAIN,Activités TVA,2025,Transport ferroviaire lourd de voyageurs
+0203.430.576,001,2003,74601,SECO,Activités TVA,2003,Entreprise de gardiennage et service de sécurité
+0203.430.576,001,2008,80100,SECO,Activités TVA,2008,Activités de sécurité privée
+0203.430.576,001,2008,49100,MAIN,Activités TVA,2008,Transport ferroviaire de voyageurs autre qu'urbain et suburbain

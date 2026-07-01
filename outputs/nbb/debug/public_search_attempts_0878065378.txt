@@ -1,0 +1,12 @@
+ERR		https://consult.cbso.nbb.be/api/external/broker/public/legalEntities/0878065378/deposits
+ERR		https://consult.cbso.nbb.be/api/external/broker/public/legalentities/0878065378/deposits
+ERR		https://consult.cbso.nbb.be/api/external/broker/public/legal-entities/0878065378/deposits
+ERR		https://consult.cbso.nbb.be/api/external/broker/public/legalEntity/0878065378/references
+ERR		https://consult.cbso.nbb.be/api/external/broker/public/legalEntities/0878065378/references
+ERR		https://consult.cbso.nbb.be/api/external/broker/public/enterprise/0878065378/deposits
+ERR		https://consult.cbso.nbb.be/api/external/broker/public/enterprises/0878065378/deposits
+ERR		https://consult.cbso.nbb.be/api/external/broker/public/deposits?enterpriseNumber=0878065378
+ERR		https://consult.cbso.nbb.be/api/external/broker/public/deposits?legalEntityNumber=0878065378
+ERR		https://consult.cbso.nbb.be/api/external/broker/public/deposits/search?enterpriseNumber=0878065378
+ERR		https://consult.cbso.nbb.be/api/external/broker/public/search/deposits?enterpriseNumber=0878065378
+ERR		https://consult.cbso.nbb.be/api/external/broker/public/legalentities?enterpriseNumber=0878065378
