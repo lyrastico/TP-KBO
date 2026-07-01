@@ -13,8 +13,8 @@ services:
     ports:
       - "27017:27017"
     volumes:
-      # Données stockées sur D: (disque avec de l'espace) via bind mount.
-      - ${MONGO_DATA_HOST:-D:/DockerData/kbo-mongo}:/data/db
+      # Emplacement des données MongoDB (bind mount). Voir MONGO_DATA_HOST dans .env.
+      - ${MONGO_DATA_HOST:-./data/mongo}:/data/db
 
   # Interface web pour inspecter les collections (http://localhost:8081)
   mongo-express:

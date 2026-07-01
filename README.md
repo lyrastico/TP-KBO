@@ -32,32 +32,63 @@ CSV KBO Open Data ──► Bronze ──► Silver ──► Ciblage hôtelleri
 
 ## Prérequis
 
-- Python 3.10+
-- Docker Desktop (pour MongoDB)
+- **Python 3.10+**
+- **Docker Desktop** (Windows/Mac) ou Docker Engine + plugin Compose (Linux), pour MongoDB
+- ~10 Go d'espace disque libre (Bronze + Silver du KBO complet)
+
+## Démarrage rapide (nouvelle machine)
 
 ```bash
+# 1. Dépendances Python
 pip install -r requirements.txt
+
+# 2. Configuration
+cp .env.example .env          # puis éditer .env si besoin (voir notes ci-dessous)
+
+# 3. Base de données
+docker compose up -d mongo mongo-express      # Mongo Express : http://localhost:8081
+
+# 4. Données KBO -> data/KBO/  (voir "Données KBO" ci-dessous)
+
+# 5. Vérifier que tout répond
+python -m kbo ping            # -> "MongoDB : OK"
+
+# 6. Test rapide sur un échantillon (sans charger les 1,95 M)
+python -m kbo bronze --limit 5000
+python -m kbo silver --limit 5000
+python -m kbo state
+
+# 7. Run complet
+python -m kbo all             # bronze -> silver -> target-hotels
 ```
 
-## Installation
+> **Sous Windows**, si `docker` n'est pas reconnu, ajouter au PATH de la session :
+> `C:\Program Files\Docker\Docker\resources\bin` (il contient aussi
+> `docker-credential-desktop`, requis pour tirer les images).
 
-1. Copier la configuration et l'ajuster si besoin :
+### Notes de configuration (`.env`)
 
-   ```bash
-   cp .env.example .env
-   ```
+- **`MONGO_DATA_HOST`** — où MongoDB écrit ses données. Défaut : `./data/mongo`
+  (dans le projet). Si le disque système manque de place, pointer vers un autre
+  disque (ex. `D:/DockerData/kbo-mongo` sous Windows, `/mnt/data/kbo-mongo` sous Linux).
+- **`NBB_API_KEY`** — obligatoire pour `scrape-nbb` uniquement (voir plus bas).
 
-2. Démarrer MongoDB (+ interface Mongo Express sur http://localhost:8081) :
+### Données KBO
 
-   ```bash
-   docker compose up -d mongo mongo-express
-   ```
+Les CSV proviennent du **portail KBO Open Data** (inscription gratuite) :
+https://kbopub.economie.fgov.be/kbo-open-data/
 
-   > Les données MongoDB sont stockées sur le disque défini par `MONGO_DATA_HOST`
-   > (`.env`), le KBO complet ne tenant pas sur un petit disque système.
+Télécharger l'extrait complet (« KBO Open Data — Full »), le décompresser, et placer
+les fichiers dans `data/KBO/` :
 
-3. Placer les CSV KBO Open Data dans `data/KBO/` (`enterprise.csv`, `denomination.csv`,
-   `address.csv`, `activity.csv`, `contact.csv`, `establishment.csv`, `code.csv`).
+```
+data/KBO/
+├── enterprise.csv     denomination.csv    address.csv
+├── activity.csv       contact.csv         establishment.csv
+└── code.csv
+```
+
+Ces fichiers ne sont pas versionnés (trop volumineux, ~2 Go).
 
 ## Utilisation
 
