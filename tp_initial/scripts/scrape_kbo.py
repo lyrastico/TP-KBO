@@ -86,14 +86,14 @@ def fetch(url: str, params: Optional[dict] = None, timeout: int = 30) -> Optiona
     try:
         r = requests.get(url, params=params, headers=HEADERS, timeout=timeout)
         if r.status_code >= 400:
-            print(f"  ⚠️ HTTP {r.status_code} sur {url}")
+            print(f"  [!] HTTP {r.status_code} sur {url}")
             return None
         if not r.text or len(r.text.strip()) < 100:
-            print(f"  ⚠️ Réponse vide ou trop courte sur {url}")
+            print(f"  [!] Réponse vide ou trop courte sur {url}")
             return None
         return r.text
     except Exception as exc:
-        print(f"  ⚠️ Requête impossible : {exc}")
+        print(f"  [!] Requête impossible : {exc}")
         return None
 
 
@@ -364,10 +364,10 @@ def save_tables(tables: Dict[str, pd.DataFrame], force: bool = False) -> None:
     for name, df in tables.items():
         path = OUT_DIR / f"{name}.csv"
         if path.exists() and not force:
-            print(f"⚠️ Existe déjà, non écrasé : {path}  (utilise --force pour écraser)")
+            print(f"[!] Existe déjà, non écrasé : {path}  (utilise --force pour écraser)")
             continue
         df.to_csv(path, index=False, encoding="utf-8-sig")
-        print(f"✅ Créé : {path} ({len(df)} lignes)")
+        print(f"[OK] Créé : {path} ({len(df)} lignes)")
 
 
 def save_external_exports(kv_by_num: Dict[str, Dict[str, str]], ejustice_rows: List[Dict[str, str]], force: bool = False) -> None:
@@ -382,13 +382,13 @@ def save_external_exports(kv_by_num: Dict[str, Dict[str, str]], ejustice_rows: L
         path = out / "kbo_public_search_scrape.csv"
         if force or not path.exists():
             pd.DataFrame(kv_rows).to_csv(path, index=False, encoding="utf-8-sig")
-            print(f"✅ Export scraping KBO : {path}")
+            print(f"[OK] Export scraping KBO : {path}")
 
     if ejustice_rows:
         path = out / "ejustice_publications_links.csv"
         if force or not path.exists():
             pd.DataFrame(ejustice_rows).to_csv(path, index=False, encoding="utf-8-sig")
-            print(f"✅ Export liens eJustice : {path}")
+            print(f"[OK] Export liens eJustice : {path}")
 
 
 def main() -> int:
@@ -417,7 +417,7 @@ def main() -> int:
             time.sleep(0.7)
         except Exception as exc:
             failures.append(f"{dotted_num(num)} : {exc}")
-            print(f"❌ {failures[-1]}")
+            print(f"[X] {failures[-1]}")
 
     if not scraped_companies:
         print("\nÉchec : aucune entreprise n'a été récupérée. Aucun CSV n'a été créé.")

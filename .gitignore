@@ -1,6 +1,13 @@
 # Données brutes KBO (trop volumineuses pour GitHub)
 data/
 
+# Secrets / config locale (contient NBB_API_KEY)
+.env
+
+# Logs d'exécution (on garde le dossier, pas les fichiers)
+logs/*
+!logs/.gitkeep
+
 # Python
 __pycache__/
 *.py[cod]
@@ -15,3 +22,7 @@ env/
 # OS
 .DS_Store
 Thumbs.db
+
+# Claude Code (config/état local)
+.claude/
+CLAUDE.local.md

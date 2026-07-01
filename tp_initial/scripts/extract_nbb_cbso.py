@@ -109,7 +109,7 @@ def request(session: requests.Session, method: str, url: str, **kwargs) -> reque
         r = session.request(method, url, timeout=30, **kwargs)
         return r
     except requests.RequestException as exc:
-        print(f"    ⚠️ requête échouée: {url} -> {exc}")
+        print(f"    [!] requête échouée: {url} -> {exc}")
         return None
 
 
@@ -303,12 +303,12 @@ def official_ws_references(session: requests.Session, enterprise_number: str, ap
         return []
     (debug_dir / f"official_refs_{n}_status.txt").write_text(f"{r.status_code}\n{r.text[:2000]}", encoding="utf-8", errors="ignore")
     if r.status_code >= 400:
-        print(f"    ⚠️ Webservice officiel refusé ({r.status_code}). Vérifie la clé API / subscription.")
+        print(f"    [!] Webservice officiel refusé ({r.status_code}). Vérifie la clé API / subscription.")
         return []
     try:
         data = r.json()
     except ValueError:
-        print("    ⚠️ Webservice officiel: réponse non JSON.")
+        print("    [!] Webservice officiel: réponse non JSON.")
         return []
     (debug_dir / f"official_refs_{n}.json").write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     return parse_deposits_json(data)
@@ -439,7 +439,7 @@ def download_for_deposit(
     target_csv = csv_dir / f"{year}.csv"
 
     if target_csv.exists() and target_csv.stat().st_size > 0:
-        print(f"    ✅ déjà présent: {target_csv}")
+        print(f"    [OK] déjà présent: {target_csv}")
         return True
 
     downloads: list[tuple[str, bytes, str]] = []
@@ -461,7 +461,7 @@ def download_for_deposit(
         downloads.extend(official_ws_accounting_data(session, deposit, api_key))
 
     if not downloads:
-        print("    ⚠️ aucun document téléchargeable trouvé pour ce dépôt")
+        print("    [!] aucun document téléchargeable trouvé pour ce dépôt")
         return False
 
     made_csv = False
@@ -471,7 +471,7 @@ def download_for_deposit(
 
         if kind == "csv":
             target_csv.write_bytes(content)
-            print(f"    ✅ CSV téléchargé: {target_csv}")
+            print(f"    [OK] CSV téléchargé: {target_csv}")
             made_csv = True
             break
         elif kind == "xbrl":
@@ -479,27 +479,27 @@ def download_for_deposit(
             xbrl_path.write_bytes(content)
             rows = xbrl_to_csv(content, target_csv)
             if rows:
-                print(f"    ✅ XBRL converti en CSV brut: {target_csv} ({rows} faits)")
+                print(f"    [OK] XBRL converti en CSV brut: {target_csv} ({rows} faits)")
                 made_csv = True
                 break
-            print(f"    ⚠️ XBRL sauvegardé mais non convertible: {xbrl_path}")
+            print(f"    [!] XBRL sauvegardé mais non convertible: {xbrl_path}")
         elif kind == "pdf":
             pdf_path = raw_dir / f"{year}.pdf"
             pdf_path.write_bytes(content)
-            print(f"    ℹ️ PDF sauvegardé uniquement: {pdf_path}")
+            print(f"    ℹ PDF sauvegardé uniquement: {pdf_path}")
         elif kind == "zip":
             extracted = save_zip_members(content, raw_dir)
-            print(f"    ℹ️ ZIP sauvegardé/extrait dans {raw_dir}")
+            print(f"    ℹ ZIP sauvegardé/extrait dans {raw_dir}")
             for p in extracted:
                 if p.suffix.lower() in [".csv", ".txt"]:
                     target_csv.write_bytes(p.read_bytes())
-                    print(f"    ✅ CSV extrait du ZIP: {target_csv}")
+                    print(f"    [OK] CSV extrait du ZIP: {target_csv}")
                     made_csv = True
                     break
                 if p.suffix.lower() in [".xbrl", ".xml"]:
                     rows = xbrl_to_csv(p.read_bytes(), target_csv)
                     if rows:
-                        print(f"    ✅ XBRL du ZIP converti en CSV brut: {target_csv} ({rows} faits)")
+                        print(f"    [OK] XBRL du ZIP converti en CSV brut: {target_csv} ({rows} faits)")
                         made_csv = True
                         break
             if made_csv:
@@ -507,11 +507,11 @@ def download_for_deposit(
         elif kind == "json":
             json_path = raw_dir / f"{year}.json"
             json_path.write_bytes(content)
-            print(f"    ℹ️ JSON sauvegardé: {json_path}")
+            print(f"    ℹ JSON sauvegardé: {json_path}")
         else:
             bin_path = raw_dir / f"{year}.bin"
             bin_path.write_bytes(content)
-            print(f"    ℹ️ fichier brut sauvegardé: {bin_path}")
+            print(f"    ℹ fichier brut sauvegardé: {bin_path}")
 
     return made_csv
 
@@ -576,13 +576,13 @@ def main() -> int:
     print("Découverte des endpoints publics Consult...")
     paths = discover_public_api_paths(session, dirs["debug"])
     if paths:
-        print(f"  ✅ {len(paths)} chemins API trouvés dans le front Consult")
+        print(f"  [OK] {len(paths)} chemins API trouvés dans le front Consult")
         for path in paths[:10]:
             print(f"    {path}")
         if len(paths) > 10:
             print("    ...")
     else:
-        print("  ⚠️ aucun chemin API trouvé automatiquement")
+        print("  [!] aucun chemin API trouvé automatiquement")
 
     if args.discover_only:
         print(f"\nRésultats debug dans : {dirs['debug']}")
@@ -627,7 +627,7 @@ def main() -> int:
         write_manifest(name, num, refs, selected, dirs)
 
         if not refs:
-            print("  ❌ aucune référence de dépôt trouvée. Regarde outputs/nbb/debug/ pour les réponses HTTP.")
+            print("  [X] aucune référence de dépôt trouvée. Regarde outputs/nbb/debug/ pour les réponses HTTP.")
             total_missing += len(args.years)
             continue
 
@@ -637,7 +637,7 @@ def main() -> int:
             print(f"  {year}:")
             dep = selected.get(year)
             if not dep:
-                print("    ⚠️ aucun dépôt correspondant à cette année")
+                print("    [!] aucun dépôt correspondant à cette année")
                 total_missing += 1
                 continue
             ok = download_for_deposit(session, dep, num, year, dirs, api_key=args.api_key)

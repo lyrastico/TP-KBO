@@ -1,92 +1,137 @@
-# TP KBO/BCE — Extraction et analyse de données d'entreprises belges
+# TP KBO/BCE — Pipeline médaillon (Bronze / Silver) + scraping financier NBB
 
-Projet d'extraction, de consolidation et d'analyse des données publiques de trois
-entreprises belges à partir de sources officielles :
+Pipeline de traitement des données publiques d'entreprises belges (Banque-Carrefour
+des Entreprises / KBO) selon une **architecture médaillon** sur MongoDB, puis scraping
+ciblé des comptes annuels déposés à la **Banque Nationale de Belgique (NBB CBSO)** pour
+le secteur hôtelier.
 
-| Entreprise | Numéro d'entreprise |
+## Vue d'ensemble
+
+```
+CSV KBO Open Data ──► Bronze ──► Silver ──► Ciblage hôtellerie ──► StateDB ──► Scraping NBB
+  (data/KBO)      enterprise_   enterprise_   (NACE 55xxx)        (state_nbb)   (dépôts 2021+)
+                    finale        silver
+```
+
+- **Bronze** (`enterprise_finale`) : ingestion brute des CSV KBO, un document par
+  entreprise avec ses enfants imbriqués (dénominations, adresses, activités, contacts,
+  établissements). Aucune transformation métier.
+- **Silver** (`enterprise_silver`) : couche nettoyée et enrichie (voir règles ci-dessous).
+- **StateDB** (`state_nbb`) : suivi du scraping NBB (`pending` / `in_progress` / `done`),
+  avec reprise après interruption.
+
+### Règles de nettoyage Silver
+
+1. **Dates normalisées** : `DD-MM-YYYY` → `YYYY-MM-DD` (l'originale est conservée).
+2. **Activités dédupliquées** sur `(NaceCode, Classification)` — les codes de versions
+   NACE différentes sont conservés.
+3. **Adresse unique** : seul le siège (`TypeOfAddress = REGO`) est gardé.
+4. **Dénomination principale** (`TypeOfDenomination = 001`) placée en tête.
+5. **Décodage des codes → labels FR** via `code.csv` (forme juridique, statut, NACE…),
+   les codes originaux étant conservés.
+
+## Prérequis
+
+- Python 3.10+
+- Docker Desktop (pour MongoDB)
+
+```bash
+pip install -r requirements.txt
+```
+
+## Installation
+
+1. Copier la configuration et l'ajuster si besoin :
+
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Démarrer MongoDB (+ interface Mongo Express sur http://localhost:8081) :
+
+   ```bash
+   docker compose up -d mongo mongo-express
+   ```
+
+   > Les données MongoDB sont stockées sur le disque défini par `MONGO_DATA_HOST`
+   > (`.env`), le KBO complet ne tenant pas sur un petit disque système.
+
+3. Placer les CSV KBO Open Data dans `data/KBO/` (`enterprise.csv`, `denomination.csv`,
+   `address.csv`, `activity.csv`, `contact.csv`, `establishment.csv`, `code.csv`).
+
+## Utilisation
+
+Le pipeline s'exécute via le module `kbo` :
+
+```bash
+python -m kbo ping                 # teste la connexion MongoDB
+python -m kbo bronze               # ingestion CSV KBO -> Bronze
+python -m kbo silver               # Bronze -> Silver
+python -m kbo target-hotels        # ciblage hôtellerie -> StateDB
+python -m kbo scrape-nbb           # scraping des dépôts NBB (nécessite une clé, voir plus bas)
+python -m kbo state                # état de la StateDB
+
+python -m kbo all                  # bronze -> silver -> target-hotels d'affilée
+```
+
+Chaque commande accepte `--limit N` pour travailler sur un échantillon (utile en test).
+
+### Ciblage hôtellerie
+
+Filtre appliqué sur le Bronze pour identifier les entreprises hôtelières éligibles :
+
+| Critère | Valeur |
 |---|---|
-| Google Belgium | `0878.065.378` |
-| Apple Belgium | `0836.157.420` |
-| SNCB | `0203.430.576` |
+| Statut | `AC` (actif) |
+| Type d'entreprise | `2` (personne morale privée) |
+| Classification d'activité | `MAIN` |
+| Code NACE | dans la liste hôtellerie (`55100`, `55201`…`55900`) |
+| Forme juridique | hors entités publiques (services fédéraux, communes, intercommunales…) |
 
-## Objectif
+### Scraping NBB CBSO
 
-À partir du numéro d'entreprise de chaque société, le projet reconstitue un jeu de
-données structuré (identité, forme juridique, adresses, activités, publications
-légales, comptes annuels) en s'appuyant **uniquement sur des données réellement
-récupérées en ligne** — aucune donnée n'est inventée ou saisie manuellement. Si une
-source échoue, le script s'arrête ou laisse le champ vide plutôt que de produire une
-valeur factice.
+Le scraping utilise le **webservice officiel NBB CBSO** (`ws.cbso.nbb.be/authentic/…`),
+qui nécessite une **clé de souscription gratuite** :
 
-## Sources de données
+1. Créer un compte sur https://developer.cbso.nbb.be et l'activer.
+2. Souscrire au produit de consultation pour obtenir une *Subscription Key*.
+3. Renseigner la clé dans `.env` : `NBB_API_KEY=votre_clé`.
 
-- **KBO / BCE — Banque-Carrefour des Entreprises**
-  ([KBO Public Search](https://kbopub.economie.fgov.be)) : identité, forme juridique,
-  situation juridique, adresse, établissements.
-- **eJustice / Moniteur belge**
-  ([ejustice.just.fgov.be](https://www.ejustice.just.fgov.be)) : publications légales
-  et statuts.
-- **NBB / CBSO — Banque Nationale de Belgique**
-  ([consult.cbso.nbb.be](https://consult.cbso.nbb.be)) : comptes annuels déposés
-  (XBRL / PDF).
+Le scraping récupère, pour chaque entreprise cible, les dépôts d'exercice ≥ 2021,
+télécharge les données comptables et les stocke sous `/<entreprise>/nbb/<année>/<ref>`
+(HDFS ou miroir local selon `HDFS_BACKEND`). Il gère le **rate limit (429)** en
+s'arrêtant proprement, et la StateDB permet de **reprendre sans tout relancer**.
 
 ## Structure du projet
 
 ```
 .
-├── scrape_kbo.py            # Scraping strict KBO Public Search + liens eJustice → data/KBO/*.csv
-├── extract_nbb_cbso.py      # Extraction des comptes annuels NBB/CBSO (XBRL/PDF) → outputs/nbb/
-├── sujet_Louis_barthes.ipynb# Notebook d'analyse : chargement, recherche par entreprise, traduction des codes
-├── data/                    # Données brutes KBO (NON versionné — ~2 Go, voir .gitignore)
-│   └── KBO/                 #   enterprise, denomination, address, activity, contact, establishment, code
-└── outputs/                 # CSV consolidés et exports par entreprise
-    ├── apple_belgium/       #   activities, addresses, denominations, enterprise, establishments
-    ├── google_belgium/
-    ├── nbb/                 #   comptes annuels extraits
-    └── *.csv                #   infos générales/juridiques, dirigeants, contacts, publications, etc.
+├── kbo/                     # Backend du pipeline
+│   ├── config.py            #   configuration (env / .env)
+│   ├── db.py                #   connexion MongoDB
+│   ├── codes.py             #   code.csv -> labels FR
+│   ├── bronze.py            #   ingestion CSV -> Bronze (jointure par fusion en streaming)
+│   ├── silver.py            #   Bronze -> Silver (5 règles de nettoyage)
+│   ├── hotellerie.py        #   ciblage secteur hôtelier -> StateDB
+│   ├── statedb.py           #   suivi du scraping
+│   ├── storage.py           #   stockage des dépôts (HDFS / local)
+│   ├── nbb.py               #   scraping NBB CBSO
+│   └── cli.py               #   point d'entrée `python -m kbo`
+├── data/                    # CSV bruts KBO (non versionnés)
+├── logs/                    # logs d'exécution (non versionnés)
+├── tp_initial/              # TP initial (notebook + scripts d'exploration) — archivé
+├── docker-compose.yml       # MongoDB (+ Mongo Express, HDFS optionnel)
+├── requirements.txt
+├── .env.example
+└── README.md
 ```
 
-> ⚠️ Le dossier `data/` (données brutes KBO Open Data, ~2 Go) n'est pas versionné sur
-> GitHub. Il doit être téléchargé séparément ou régénéré via `scrape_kbo.py`.
+## Notes techniques
 
-## Prérequis
-
-- Python 3.10+
-- Dépendances :
-
-```bash
-pip install pandas requests beautifulsoup4 lxml
-```
-
-## Utilisation
-
-### 1. Extraction KBO (identité, adresses, publications légales)
-
-```bash
-python scrape_kbo.py           # génère data/KBO/*.csv
-python scrape_kbo.py --force   # écrase les CSV existants
-```
-
-### 2. Extraction des comptes annuels NBB/CBSO
-
-```bash
-python extract_nbb_cbso.py
-python extract_nbb_cbso.py --years 2021 2022 2023 2024
-python extract_nbb_cbso.py --company 0878.065.378
-python extract_nbb_cbso.py --api-key VOTRE_CLE_NBB_CBSO   # webservices officiels (optionnel)
-```
-
-### 3. Analyse
-
-Ouvrir `sujet_Louis_barthes.ipynb` dans VS Code ou Jupyter, puis **Restart Kernel →
-Run All**. Le notebook :
-
-1. Crée l'entité initiale à partir du catalogue de CSV KBO.
-2. Recherche et consolide les données de Google, Apple et la SNCB.
-3. Traduit les codes techniques KBO en libellés lisibles (FR / NL).
-
-## Remarques
-
-- L'API publique de Consult (NBB) est gratuite mais peut changer sans préavis ; les
-  webservices officiels CBSO nécessitent une souscription et une clé API.
-- Le scraping respecte un délai entre requêtes pour ne pas surcharger les services publics.
+- **Ingestion mémoire constante** : les CSV KBO étant triés par numéro d'entité,
+  le Bronze est construit par **jointure par fusion en streaming** — l'ingestion des
+  ~34 M lignes d'activités tient dans une mémoire bornée.
+- **HDFS optionnel** : `docker compose --profile hdfs up -d` démarre un cluster HDFS
+  (WebHDFS sur http://localhost:9870) ; sinon les dépôts sont écrits dans un miroir local.
+- Le dossier `tp_initial/` conserve la première version du TP (notebook Jupyter et
+  scripts) à titre de référence ; il n'est plus utilisé par le pipeline.
