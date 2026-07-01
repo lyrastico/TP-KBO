@@ -4,6 +4,9 @@ data/
 # Config locale
 .env
 
+# Démon local (chemins spécifiques à la machine)
+scrape_daemon.cmd
+
 # Logs d'exécution (on garde le dossier, pas les fichiers)
 logs/*
 !logs/.gitkeep

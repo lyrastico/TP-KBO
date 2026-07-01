@@ -46,7 +46,7 @@ _PAGE_SIZE = 100
 _MAX_PAGES = 50  # garde-fou
 
 # Backoff sur 429 : on respecte le signal du serveur en ralentissant avant de réessayer.
-_RETRY_BACKOFFS = (30, 60, 90, 120)  # secondes
+_RETRY_BACKOFFS = (10, 20, 40, 60)  # secondes (le bucket se recharge en quelques s)
 
 
 class RateLimited(Exception):

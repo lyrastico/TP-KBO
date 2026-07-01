@@ -45,8 +45,19 @@ def _cmd_target(args) -> None:
 
 
 def _cmd_scrape(args) -> None:
-    from . import nbb
-    nbb.scrape(limit=args.limit, delay=args.delay)
+    import time
+
+    from . import nbb, statedb
+    if not args.loop:
+        nbb.scrape(limit=args.limit, delay=args.delay)
+        return
+    # Boucle de reprise : relance jusqu'à ce que la StateDB soit vidée.
+    while True:
+        nbb.scrape(delay=args.delay)
+        if statedb.stats().get("pending", 0) == 0:
+            print("Scraping terminé : plus rien en pending.")
+            break
+        time.sleep(args.cooldown)
 
 
 def _cmd_state(_args) -> None:
@@ -85,6 +96,10 @@ def main(argv: list[str] | None = None) -> int:
     scrape_parser = subparsers.add_parser("scrape-nbb", help="Scraping des dépôts NBB des entreprises pending")
     scrape_parser.add_argument("--limit", type=int, default=None)
     scrape_parser.add_argument("--delay", type=float, default=0.5, help="Délai entre requêtes (s)")
+    scrape_parser.add_argument("--loop", action="store_true",
+                               help="Relancer jusqu'à ce que la StateDB soit vidée")
+    scrape_parser.add_argument("--cooldown", type=int, default=60,
+                               help="Pause entre deux passes en mode --loop (s)")
     scrape_parser.set_defaults(func=_cmd_scrape)
 
     state_parser = subparsers.add_parser("state", help="Affiche l'état de la StateDB")
