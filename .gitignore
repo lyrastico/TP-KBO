@@ -1,7 +1,7 @@
 # Données brutes KBO (trop volumineuses pour GitHub)
 data/
 
-# Secrets / config locale (contient NBB_API_KEY)
+# Config locale
 .env
 
 # Logs d'exécution (on garde le dossier, pas les fichiers)

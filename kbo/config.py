@@ -24,13 +24,8 @@ STATE_COLLECTION = _get("STATE_COLLECTION", "state_nbb")
 KBO_DIR = Path(_get("KBO_DIR", "data/KBO"))
 
 # --- Scraping NBB ----------------------------------------------------------
-NBB_YEARS = [int(y) for y in _get("NBB_YEARS", "2021,2022,2023,2024,2025").split(",") if y.strip()]
-# Clé de souscription NBB CBSO (header NBB-CBSO-Subscription-Key). Gratuite via
-# https://developer.cbso.nbb.be — obligatoire, l'API renvoie 403 sans elle.
-NBB_API_KEY = _get("NBB_API_KEY", "").strip()
-# Webservice officiel NBB CBSO (production). "authentic" = données authentiques.
-NBB_WS_BASE = _get("NBB_WS_BASE", "https://ws.cbso.nbb.be")
-NBB_WS_API = _get("NBB_WS_API", "authentic")
+# Année d'exercice minimale des dépôts à récupérer.
+NBB_MIN_YEAR = int(_get("NBB_MIN_YEAR", "2021"))
 
 # --- Stockage HDFS ---------------------------------------------------------
 HDFS_BACKEND = _get("HDFS_BACKEND", "local").lower()

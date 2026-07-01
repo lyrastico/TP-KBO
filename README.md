@@ -71,7 +71,7 @@ python -m kbo all             # bronze -> silver -> target-hotels
 - **`MONGO_DATA_HOST`** — où MongoDB écrit ses données. Défaut : `./data/mongo`
   (dans le projet). Si le disque système manque de place, pointer vers un autre
   disque (ex. `D:/DockerData/kbo-mongo` sous Windows, `/mnt/data/kbo-mongo` sous Linux).
-- **`NBB_API_KEY`** — obligatoire pour `scrape-nbb` uniquement (voir plus bas).
+- Le scraping NBB (`scrape-nbb`) ne nécessite **aucune clé** (API publique).
 
 ### Données KBO
 
@@ -99,7 +99,7 @@ python -m kbo ping                 # teste la connexion MongoDB
 python -m kbo bronze               # ingestion CSV KBO -> Bronze
 python -m kbo silver               # Bronze -> Silver
 python -m kbo target-hotels        # ciblage hôtellerie -> StateDB
-python -m kbo scrape-nbb           # scraping des dépôts NBB (nécessite une clé, voir plus bas)
+python -m kbo scrape-nbb           # scraping des dépôts NBB (API publique, sans clé)
 python -m kbo state                # état de la StateDB
 
 python -m kbo all                  # bronze -> silver -> target-hotels d'affilée
@@ -121,17 +121,21 @@ Filtre appliqué sur le Bronze pour identifier les entreprises hôtelières éli
 
 ### Scraping NBB CBSO
 
-Le scraping utilise le **webservice officiel NBB CBSO** (`ws.cbso.nbb.be/authentic/…`),
-qui nécessite une **clé de souscription gratuite** :
+Le scraping utilise l'**API publique de consultation** (celle du site
+consult.cbso.nbb.be). Les comptes annuels déposés sont **publics par la loi belge** :
+aucune clé ni authentification n'est requise.
 
-1. Créer un compte sur https://developer.cbso.nbb.be et l'activer.
-2. Souscrire au produit de consultation pour obtenir une *Subscription Key*.
-3. Renseigner la clé dans `.env` : `NBB_API_KEY=votre_clé`.
+```bash
+python -m kbo scrape-nbb              # toutes les entreprises pending
+python -m kbo scrape-nbb --limit 3    # test sur 3 entreprises
+python -m kbo scrape-nbb --delay 1    # ralentir (politesse envers le service public)
+```
 
-Le scraping récupère, pour chaque entreprise cible, les dépôts d'exercice ≥ 2021,
-télécharge les données comptables et les stocke sous `/<entreprise>/nbb/<année>/<ref>`
-(HDFS ou miroir local selon `HDFS_BACKEND`). Il gère le **rate limit (429)** en
-s'arrêtant proprement, et la StateDB permet de **reprendre sans tout relancer**.
+Pour chaque entreprise cible, le scraper liste les dépôts publiés, garde ceux
+d'exercice ≥ 2021, télécharge le **CSV comptable** (codes PCMN et valeurs) et le stocke
+sous `/<entreprise>/nbb/<année>/<référence>.csv` (HDFS ou miroir local selon
+`HDFS_BACKEND`). Il respecte un délai entre les requêtes, gère le **rate limit (429)**
+en s'arrêtant proprement, et la StateDB permet de **reprendre sans tout relancer**.
 
 ## Structure du projet
 

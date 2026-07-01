@@ -46,10 +46,7 @@ def _cmd_target(args) -> None:
 
 def _cmd_scrape(args) -> None:
     from . import nbb
-    try:
-        nbb.scrape(limit=args.limit, delay=args.delay)
-    except nbb.MissingApiKey as exc:
-        print(f"Erreur : {exc}")
+    nbb.scrape(limit=args.limit, delay=args.delay)
 
 
 def _cmd_state(_args) -> None:
