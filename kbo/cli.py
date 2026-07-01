@@ -31,7 +31,7 @@ def _cmd_ping(_args) -> None:
 
 def _cmd_bronze(args) -> None:
     from . import bronze
-    bronze.build(limit=args.limit)
+    bronze.build(limit=args.limit, keep_staging=args.keep_staging)
 
 
 def _cmd_silver(args) -> None:
@@ -69,7 +69,9 @@ def main(argv: list[str] | None = None) -> int:
     ping_parser.set_defaults(func=_cmd_ping)
 
     bronze_parser = subparsers.add_parser("bronze", help="Ingestion CSV KBO -> Bronze (enterprise_finale)")
-    bronze_parser.add_argument("--limit", type=int, default=None, help="Limiter le nombre d'entreprises (test)")
+    bronze_parser.add_argument("--limit", type=int, default=None, help="Limiter les lignes par CSV (test)")
+    bronze_parser.add_argument("--keep-staging", action="store_true",
+                               help="Conserver les collections raw_* (étage brut)")
     bronze_parser.set_defaults(func=_cmd_bronze)
 
     silver_parser = subparsers.add_parser("silver", help="Bronze -> Silver (enterprise_silver)")

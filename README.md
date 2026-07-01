@@ -163,9 +163,11 @@ en s'arrêtant proprement, et la StateDB permet de **reprendre sans tout relance
 
 ## Notes techniques
 
-- **Ingestion mémoire constante** : les CSV KBO étant triés par numéro d'entité,
-  le Bronze est construit par **jointure par fusion en streaming** — l'ingestion des
-  ~34 M lignes d'activités tient dans une mémoire bornée.
+- **Ingestion mémoire constante** : chaque CSV est chargé en flux dans une collection
+  `raw_*` (lecture ligne à ligne + insertion par lots), puis `enterprise_finale` est
+  assemblée par **jointure côté MongoDB** (`$group` + `$merge`). La jointure des ~34 M
+  lignes d'activités est portée par la base (spill disque), pas par la mémoire Python.
+  `--keep-staging` conserve les collections `raw_*` comme étage brut.
 - **HDFS optionnel** : `docker compose --profile hdfs up -d` démarre un cluster HDFS
   (WebHDFS sur http://localhost:9870) ; sinon les dépôts sont écrits dans un miroir local.
 - Le dossier `tp_initial/` conserve la première version du TP (notebook Jupyter et
