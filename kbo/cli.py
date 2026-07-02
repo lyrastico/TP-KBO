@@ -6,6 +6,8 @@ Usage :
     python -m kbo silver            [--limit N]
     python -m kbo target-hotels     [--limit N]
     python -m kbo scrape-nbb        [--limit N] [--delay 0.5]
+    python -m kbo gold              [--limit N]
+    python -m kbo refresh           [--limit N]   (incrémental : nouveaux dépôts -> Gold)
     python -m kbo state
     python -m kbo all               [--limit N]   (bronze -> silver -> target-hotels)
 """
@@ -60,6 +62,16 @@ def _cmd_scrape(args) -> None:
         time.sleep(args.cooldown)
 
 
+def _cmd_gold(args) -> None:
+    from . import gold
+    gold.build(limit=args.limit)
+
+
+def _cmd_refresh(args) -> None:
+    from . import incremental
+    incremental.refresh_all(limit=args.limit, delay=args.delay)
+
+
 def _cmd_state(_args) -> None:
     from . import statedb
     print("StateDB :", statedb.stats())
@@ -101,6 +113,16 @@ def main(argv: list[str] | None = None) -> int:
     scrape_parser.add_argument("--cooldown", type=int, default=60,
                                help="Pause entre deux passes en mode --loop (s)")
     scrape_parser.set_defaults(func=_cmd_scrape)
+
+    gold_parser = subparsers.add_parser("gold", help="Couche Gold : ratios financiers -> hotel_gold")
+    gold_parser.add_argument("--limit", type=int, default=None)
+    gold_parser.set_defaults(func=_cmd_gold)
+
+    refresh_parser = subparsers.add_parser("refresh",
+                                           help="Recalcul incrémental : nouveaux dépôts NBB -> Gold (support DAG)")
+    refresh_parser.add_argument("--limit", type=int, default=None)
+    refresh_parser.add_argument("--delay", type=float, default=0.5)
+    refresh_parser.set_defaults(func=_cmd_refresh)
 
     state_parser = subparsers.add_parser("state", help="Affiche l'état de la StateDB")
     state_parser.set_defaults(func=_cmd_state)

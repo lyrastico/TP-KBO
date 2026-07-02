@@ -31,6 +31,14 @@ def state() -> Collection:
     return database()[config.STATE_COLLECTION]
 
 
+def gold() -> Collection:
+    return database()[config.GOLD_COLLECTION]
+
+
+def directors() -> Collection:
+    return database()[config.DIRECTORS_COLLECTION]
+
+
 def ping() -> bool:
     """Vérifie que MongoDB répond."""
     client().admin.command("ping")

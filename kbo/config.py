@@ -19,6 +19,8 @@ MONGO_DB = _get("MONGO_DB", "kbo")
 BRONZE_COLLECTION = _get("BRONZE_COLLECTION", "enterprise_finale")
 SILVER_COLLECTION = _get("SILVER_COLLECTION", "enterprise_silver")
 STATE_COLLECTION = _get("STATE_COLLECTION", "state_nbb")
+GOLD_COLLECTION = _get("GOLD_COLLECTION", "hotel_gold")
+DIRECTORS_COLLECTION = _get("DIRECTORS_COLLECTION", "directors")
 
 # --- Données KBO -----------------------------------------------------------
 KBO_DIR = Path(_get("KBO_DIR", "data/KBO"))
