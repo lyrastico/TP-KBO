@@ -40,7 +40,8 @@ CSV KBO Open Data ─► Bronze ─► Silver ─► Ciblage hôtellerie ─► 
 
 ## Prérequis
 
-- **Python 3.10+**
+- **Python 3.10+** (backend / pipeline)
+- **Node.js 18+** et **npm** (frontend React)
 - **Docker Desktop** (Windows/Mac) ou Docker Engine + plugin Compose (Linux), pour MongoDB
 - ~10 Go d'espace disque libre (Bronze + Silver du KBO complet)
 
@@ -102,6 +103,53 @@ data/KBO/
 ```
 
 Ces fichiers ne sont pas versionnés (trop volumineux, ~2 Go).
+
+## Lancer l'application (API + frontend)
+
+Deux temps : **construire les données une fois**, puis **démarrer les 3 services**
+(MongoDB, API, frontend) à chaque session.
+
+### A. Construire les données (une seule fois)
+
+Nécessaire uniquement sur une machine où le pipeline n'a jamais tourné. Docker
+lancé et données KBO en place (voir ci-dessus), puis **depuis `backend/`** :
+
+```bash
+docker compose up -d mongo mongo-express   # MongoDB (à la racine du repo)
+
+cd backend
+python -m kbo all                 # Bronze -> Silver -> ciblage hôtellerie
+python -m kbo scrape-nbb --loop   # télécharge les comptes annuels NBB (long, reprenable)
+python -m kbo gold                # calcule les ratios -> collection hotel_gold
+```
+
+> Si les couches `enterprise_silver` et `hotel_gold` existent déjà en base, saute
+> cette étape : passe directement au démarrage des services.
+
+### B. Démarrer les 3 services (à chaque session)
+
+Trois terminaux. **Docker Desktop doit être démarré.**
+
+```bash
+# 1) MongoDB (racine du repo) — à ne relancer que s'il est arrêté
+docker compose up -d mongo mongo-express        # Mongo Express : http://localhost:8081
+
+# 2) Backend API (terminal dédié)
+cd backend
+uvicorn kbo.api:app --port 8000                 # docs : http://localhost:8000/docs
+
+# 3) Frontend (autre terminal)
+cd frontend
+npm install                                     # première fois seulement
+npm run dev                                      # http://localhost:5173
+```
+
+Puis ouvrir **http://localhost:5173** et rechercher un hôtel (ex. `accor`, `wiltcher`,
+ou un numéro BCE). Le frontend proxifie `/api` vers le backend `:8000` (aucune config
+CORS à gérer en dev). L'API crée automatiquement l'index de recherche au premier
+démarrage (≈ 30 s une fois, instantané ensuite).
+
+**Arrêt** : `Ctrl-C` dans les terminaux API et frontend ; `docker compose stop` pour MongoDB.
 
 ## Utilisation
 
@@ -196,8 +244,8 @@ uvicorn kbo.api:app --reload --port 8000
 | `GET /api/enterprise/{number}` | fiche : identité + activités (Silver) et exercices/ratios (Gold) |
 | `GET /api/enterprise/{number}/directors` | dirigeants via **kbopub**, scrapés une fois puis persistés (`directors`) |
 
-> La recherche par nom s'appuie sur un index texte MongoDB à créer une fois :
-> `db.enterprise_silver.createIndex({name:"text"})` (ou automatiquement au premier build).
+> La recherche par nom s'appuie sur un index texte MongoDB sur `name` : l'API le crée
+> **automatiquement au démarrage** (idempotent, ≈ 30 s une fois sur base fraîche).
 > Le SSE des statuts notaire (via Tor) est laissé de côté : l'énoncé autorise à l'ignorer.
 
 ## Frontend React

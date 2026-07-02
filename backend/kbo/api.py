@@ -15,14 +15,29 @@ Lancement :
 from __future__ import annotations
 
 import re
+from contextlib import asynccontextmanager
 
 import requests
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
-from . import db
+from . import db, gold
 
-app = FastAPI(title="KBO Hôtellerie — API", version="1.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Au démarrage : garantit les index nécessaires (idempotent).
+
+    L'index texte sur `name` porte la recherche par nom ; sur une base fraîche il
+    est créé ici (~30 s une fois), instantané ensuite. Options alignées sur celles
+    du build pour éviter tout conflit d'index.
+    """
+    db.silver().create_index([("name", "text")], name="name_text", default_language="french")
+    gold.ensure_indexes()  # index unique sur enterprise_number (même définition que le build Gold)
+    yield
+
+
+app = FastAPI(title="KBO Hôtellerie — API", version="1.0", lifespan=lifespan)
 
 # Le frontend Vite tourne sur un autre port en dev : on autorise les origines locales.
 app.add_middleware(
