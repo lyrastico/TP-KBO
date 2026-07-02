@@ -46,19 +46,24 @@ CSV KBO Open Data ─► Bronze ─► Silver ─► Ciblage hôtellerie ─► 
 
 ## Démarrage rapide (nouvelle machine)
 
+Le dépôt est séparé en **`backend/`** (pipeline Python + API) et **`frontend/`**
+(React). Les commandes `python -m kbo` se lancent **depuis `backend/`** (le backend
+retrouve tout seul le `.env` et le dossier `data/` à la racine du repo).
+
 ```bash
 # 1. Dépendances Python
-pip install -r requirements.txt
+pip install -r backend/requirements.txt
 
 # 2. Configuration
-cp .env.example .env          # puis éditer .env si besoin (voir notes ci-dessous)
+cp .env.example .env          # à la racine ; éditer si besoin (voir notes ci-dessous)
 
 # 3. Base de données
 docker compose up -d mongo mongo-express      # Mongo Express : http://localhost:8081
 
 # 4. Données KBO -> data/KBO/  (voir "Données KBO" ci-dessous)
 
-# 5. Vérifier que tout répond
+# 5. Pipeline (depuis backend/)
+cd backend
 python -m kbo ping            # -> "MongoDB : OK"
 
 # 6. Test rapide sur un échantillon (sans charger les 1,95 M)
@@ -100,9 +105,10 @@ Ces fichiers ne sont pas versionnés (trop volumineux, ~2 Go).
 
 ## Utilisation
 
-Le pipeline s'exécute via le module `kbo` :
+Le pipeline s'exécute via le module `kbo`, **depuis `backend/`** :
 
 ```bash
+cd backend
 python -m kbo ping                 # teste la connexion MongoDB
 python -m kbo bronze               # ingestion CSV KBO -> Bronze
 python -m kbo silver               # Bronze -> Silver
@@ -179,6 +185,7 @@ ratio de liquidité (`tresorerie/dettes_financieres`), taux d'endettement
 ## API FastAPI
 
 ```bash
+cd backend
 uvicorn kbo.api:app --reload --port 8000
 ```
 
@@ -213,38 +220,39 @@ recalcule le Gold des seules entreprises modifiées. La logique vit dans `kbo/in
 et tourne aussi **sans Airflow** :
 
 ```bash
-python -m kbo refresh              # nouveaux dépôts NBB -> recalcul Gold ciblé
+cd backend && python -m kbo refresh   # nouveaux dépôts NBB -> recalcul Gold ciblé
 ```
 
 ## Structure du projet
 
 ```
 .
-├── kbo/                     # Backend du pipeline
-│   ├── config.py            #   configuration (env / .env)
-│   ├── db.py                #   connexion MongoDB
-│   ├── codes.py             #   code.csv -> labels FR
-│   ├── bronze.py            #   ingestion CSV -> Bronze (jointure par fusion en streaming)
-│   ├── silver.py            #   Bronze -> Silver (5 règles de nettoyage)
-│   ├── hotellerie.py        #   ciblage secteur hôtelier -> StateDB
-│   ├── statedb.py           #   suivi du scraping
-│   ├── storage.py           #   stockage des dépôts (HDFS / local)
-│   ├── nbb.py               #   scraping NBB CBSO
-│   ├── gold.py              #   comptes annuels PCMN -> ratios -> hotel_gold
-│   ├── directors.py         #   dirigeants via kbopub (persistés)
-│   ├── incremental.py       #   recalcul incrémental (support du DAG)
-│   ├── api.py               #   API FastAPI (recherche, fiche, dirigeants)
-│   └── cli.py               #   point d'entrée `python -m kbo`
+├── backend/                 # Pipeline Python + API (lancer les commandes ici)
+│   ├── kbo/                  #   package du pipeline
+│   │   ├── config.py         #     configuration (résout .env + chemins depuis la racine)
+│   │   ├── db.py             #     connexion MongoDB
+│   │   ├── codes.py          #     code.csv -> labels FR
+│   │   ├── bronze.py         #     ingestion CSV -> Bronze (jointure par fusion en streaming)
+│   │   ├── silver.py         #     Bronze -> Silver (5 règles de nettoyage)
+│   │   ├── hotellerie.py     #     ciblage secteur hôtelier -> StateDB
+│   │   ├── statedb.py        #     suivi du scraping
+│   │   ├── storage.py        #     stockage des dépôts (HDFS / local)
+│   │   ├── nbb.py            #     scraping NBB CBSO
+│   │   ├── gold.py           #     comptes annuels PCMN -> ratios -> hotel_gold
+│   │   ├── directors.py      #     dirigeants via kbopub (persistés)
+│   │   ├── incremental.py    #     recalcul incrémental (support du DAG)
+│   │   ├── api.py            #     API FastAPI (recherche, fiche, dirigeants)
+│   │   └── cli.py            #     point d'entrée `python -m kbo`
+│   ├── dags/                 #   DAG Airflow (recalcul annuel)
+│   │   └── kbo_gold_refresh.py
+│   └── requirements.txt
 ├── frontend/                # Frontend React (Vite + Redux Toolkit)
 │   └── src/                 #   composants, store, api RTK Query
-├── dags/                    # DAG Airflow (recalcul annuel)
-│   └── kbo_gold_refresh.py
 ├── data/                    # CSV bruts KBO (non versionnés)
 ├── logs/                    # logs d'exécution (non versionnés)
 ├── tp_initial/              # TP initial (notebook + scripts d'exploration) — archivé
 ├── docker-compose.yml       # MongoDB (+ Mongo Express, HDFS optionnel)
-├── requirements.txt
-├── .env.example
+├── .env / .env.example      # config partagée (backend + Compose)
 └── README.md
 ```
 

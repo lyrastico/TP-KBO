@@ -6,11 +6,22 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-load_dotenv()
+# Racine du repo : backend/kbo/config.py -> parents[2]. Le backend devient ainsi
+# indépendant du dossier de lancement (.env et chemins de données résolus ici, pas
+# depuis le CWD).
+BASE_DIR = Path(__file__).resolve().parents[2]
+
+load_dotenv(BASE_DIR / ".env")
 
 
 def _get(name: str, default: str) -> str:
     return os.getenv(name, default)
+
+
+def _resolve(raw: str) -> Path:
+    """Chemin absolu tel quel, sinon relatif à la racine du repo."""
+    path = Path(raw)
+    return path if path.is_absolute() else BASE_DIR / path
 
 
 # --- MongoDB ---------------------------------------------------------------
@@ -23,7 +34,7 @@ GOLD_COLLECTION = _get("GOLD_COLLECTION", "hotel_gold")
 DIRECTORS_COLLECTION = _get("DIRECTORS_COLLECTION", "directors")
 
 # --- Données KBO -----------------------------------------------------------
-KBO_DIR = Path(_get("KBO_DIR", "data/KBO"))
+KBO_DIR = _resolve(_get("KBO_DIR", "data/KBO"))
 
 # --- Scraping NBB ----------------------------------------------------------
 # Année d'exercice minimale des dépôts à récupérer.
@@ -31,7 +42,7 @@ NBB_MIN_YEAR = int(_get("NBB_MIN_YEAR", "2021"))
 
 # --- Stockage HDFS ---------------------------------------------------------
 HDFS_BACKEND = _get("HDFS_BACKEND", "local").lower()
-HDFS_LOCAL_DIR = Path(_get("HDFS_LOCAL_DIR", "data/hdfs"))
+HDFS_LOCAL_DIR = _resolve(_get("HDFS_LOCAL_DIR", "data/hdfs"))
 WEBHDFS_URL = _get("WEBHDFS_URL", "http://localhost:9870")
 WEBHDFS_USER = _get("WEBHDFS_USER", "root")
 
