@@ -1,17 +1,25 @@
-# TP KBO/BCE — Pipeline médaillon (Bronze / Silver) + scraping financier NBB
+# TP KBO/BCE — Pipeline médaillon (Bronze / Silver / Gold) + API + Frontend
 
 Pipeline de traitement des données publiques d'entreprises belges (Banque-Carrefour
-des Entreprises / KBO) selon une **architecture médaillon** sur MongoDB, puis scraping
+des Entreprises / KBO) selon une **architecture médaillon** sur MongoDB, scraping
 ciblé des comptes annuels déposés à la **Banque Nationale de Belgique (NBB CBSO)** pour
-le secteur hôtelier.
+le secteur hôtelier, calcul des **ratios financiers** (couche Gold), puis exposition via
+une **API FastAPI** et un **frontend React**.
 
 ## Vue d'ensemble
 
 ```
-CSV KBO Open Data ──► Bronze ──► Silver ──► Ciblage hôtellerie ──► StateDB ──► Scraping NBB
-  (data/KBO)      enterprise_   enterprise_   (NACE 55xxx)        (state_nbb)   (dépôts 2021+)
-                    finale        silver
+CSV KBO Open Data ─► Bronze ─► Silver ─► Ciblage hôtellerie ─► StateDB ─► Scraping NBB ─► Gold ─► API ─► Frontend
+  (data/KBO)     enterprise_ enterprise_  (NACE 55xxx)       (state_nbb)  (dépôts 2021+) hotel_  FastAPI  React
+                   finale      silver                                     CSV PCMN       gold
 ```
+
+- **Gold** (`hotel_gold`) : un document par entreprise, tous les exercices dans `years`
+  avec postes comptables (parsés depuis les CSV PCMN) et **ratios** (marge nette, ROE,
+  liquidité, taux d'endettement). Voir « Couche Gold » plus bas.
+- **API FastAPI** : recherche entreprise, fiche (Silver + Gold), dirigeants (kbopub).
+- **Frontend React** (Vite + Redux Toolkit) : recherche, fiche avec **Sankey** du compte
+  de résultat et tableau de ratios par année.
 
 - **Bronze** (`enterprise_finale`) : ingestion brute des CSV KBO, un document par
   entreprise avec ses enfants imbriqués (dénominations, adresses, activités, contacts,
@@ -100,6 +108,8 @@ python -m kbo bronze               # ingestion CSV KBO -> Bronze
 python -m kbo silver               # Bronze -> Silver
 python -m kbo target-hotels        # ciblage hôtellerie -> StateDB
 python -m kbo scrape-nbb           # scraping des dépôts NBB (API publique, sans clé)
+python -m kbo gold                 # comptes annuels NBB -> ratios -> hotel_gold
+python -m kbo refresh              # incrémental : nouveaux dépôts -> Gold (support du DAG)
 python -m kbo state                # état de la StateDB
 
 python -m kbo all                  # bronze -> silver -> target-hotels d'affilée
@@ -137,6 +147,75 @@ sous `/<entreprise>/nbb/<année>/<référence>.csv` (HDFS ou miroir local selon
 `HDFS_BACKEND`). Il respecte un délai entre les requêtes, gère le **rate limit (429)**
 en s'arrêtant proprement, et la StateDB permet de **reprendre sans tout relancer**.
 
+## Couche Gold — ratios financiers (`hotel_gold`)
+
+`python -m kbo gold` lit les CSV PCMN téléchargés (chemins listés en StateDB), en
+extrait les postes comptables et calcule les ratios, puis consolide **un document par
+entreprise** (`upsert` sur `enterprise_number`), tous les exercices dans `years`.
+
+**Mapping PCMN → champ métier.** Les modèles complets rapportent souvent des codes
+**agrégés** ; chaque champ privilégie l'agrégat normalisé, sinon somme les composants :
+
+| Champ Gold | Code(s) PCMN |
+|---|---|
+| `ca` (chiffre d'affaires) | `70` |
+| `achats` | `60` (ou `60/61`) |
+| `marge_brute` | `ca - achats + variation_stocks`, sinon **`9900`** (marge brute déclarée) |
+| `ebit` | `9901` |
+| `resultat_net` | `9904` |
+| `tresorerie` | `54/58` (ou `54`+`55`) |
+| `dettes_financieres` | `17`+`43` |
+| `fonds_propres` | `10/15` (ou `10`…`15`) |
+| `capital_souscrit` | `100` (ou `10`) |
+
+> La plupart des petites structures (schémas abrégé/micro) ne publient pas le CA isolé
+> mais déclarent directement la **marge brute (code 9900)** : d'où le repli, qui porte la
+> couverture de la marge brute à ~99 %.
+
+**Ratios par exercice** : marge nette (`resultat_net/ca`), ROE (`resultat_net/fonds_propres`),
+ratio de liquidité (`tresorerie/dettes_financieres`), taux d'endettement
+(`dettes_financieres/fonds_propres`). Toute division impossible donne `null`.
+
+## API FastAPI
+
+```bash
+uvicorn kbo.api:app --reload --port 8000
+```
+
+| Endpoint | Rôle |
+|---|---|
+| `GET /api/health` | sonde MongoDB |
+| `GET /api/search?q=&limit=` | recherche par **nom** (index texte) ou **numéro BCE** (préfixe) |
+| `GET /api/enterprise/{number}` | fiche : identité + activités (Silver) et exercices/ratios (Gold) |
+| `GET /api/enterprise/{number}/directors` | dirigeants via **kbopub**, scrapés une fois puis persistés (`directors`) |
+
+> La recherche par nom s'appuie sur un index texte MongoDB à créer une fois :
+> `db.enterprise_silver.createIndex({name:"text"})` (ou automatiquement au premier build).
+> Le SSE des statuts notaire (via Tor) est laissé de côté : l'énoncé autorise à l'ignorer.
+
+## Frontend React
+
+```bash
+cd frontend
+npm install
+npm run dev        # http://localhost:5173 (proxifie /api vers :8000)
+```
+
+React + **Vite** + **Redux Toolkit** (RTK Query). Recherche temps réel, fiche entreprise
+avec **Sankey** du compte de résultat (CA → marge brute → résultat net, sélecteur
+d'exercice), tableau des ratios par année et chargement des dirigeants à la demande.
+
+## Chantier 4 — DAG Airflow (recalcul annuel incrémental)
+
+`dags/kbo_gold_refresh.py` orchestre le recalcul annuel : pour chaque entreprise `done`,
+il compare les dépôts connus avec ce que NBB expose, télécharge les nouveaux exercices et
+recalcule le Gold des seules entreprises modifiées. La logique vit dans `kbo/incremental.py`
+et tourne aussi **sans Airflow** :
+
+```bash
+python -m kbo refresh              # nouveaux dépôts NBB -> recalcul Gold ciblé
+```
+
 ## Structure du projet
 
 ```
@@ -151,7 +230,15 @@ en s'arrêtant proprement, et la StateDB permet de **reprendre sans tout relance
 │   ├── statedb.py           #   suivi du scraping
 │   ├── storage.py           #   stockage des dépôts (HDFS / local)
 │   ├── nbb.py               #   scraping NBB CBSO
+│   ├── gold.py              #   comptes annuels PCMN -> ratios -> hotel_gold
+│   ├── directors.py         #   dirigeants via kbopub (persistés)
+│   ├── incremental.py       #   recalcul incrémental (support du DAG)
+│   ├── api.py               #   API FastAPI (recherche, fiche, dirigeants)
 │   └── cli.py               #   point d'entrée `python -m kbo`
+├── frontend/                # Frontend React (Vite + Redux Toolkit)
+│   └── src/                 #   composants, store, api RTK Query
+├── dags/                    # DAG Airflow (recalcul annuel)
+│   └── kbo_gold_refresh.py
 ├── data/                    # CSV bruts KBO (non versionnés)
 ├── logs/                    # logs d'exécution (non versionnés)
 ├── tp_initial/              # TP initial (notebook + scripts d'exploration) — archivé
