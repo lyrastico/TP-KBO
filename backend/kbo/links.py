@@ -109,6 +109,21 @@ def parse_entity_links(html: str) -> list[dict]:
     return result
 
 
+def _dedupe_by_number(entity_links: list[dict]) -> list[dict]:
+    """Une ligne par entité liée. kbopub liste chaque relation dans les deux sens
+    (« X liée à cette entité » et « cette entité liée à X ») : on ne garde que la
+    première occurrence de chaque numéro, en préservant l'ordre d'apparition."""
+    seen: set[str] = set()
+    deduped: list[dict] = []
+    for link in entity_links:
+        number = link.get("number")
+        if number in seen:
+            continue
+        seen.add(number)
+        deduped.append(link)
+    return deduped
+
+
 def scrape_entity_links(enterprise_number: str) -> list[dict]:
     """Interroge kbopub et renvoie les liens entre entités (peut être vide)."""
     digits = re.sub(r"\D", "", enterprise_number)
@@ -120,7 +135,7 @@ def scrape_entity_links(enterprise_number: str) -> list[dict]:
     )
     response.raise_for_status()
     response.encoding = "windows-1252"  # kbopub sert la page en Latin-1
-    return parse_entity_links(response.text)
+    return _dedupe_by_number(parse_entity_links(response.text))
 
 
 def _annotate_in_db(entity_links: list[dict]) -> list[dict]:
@@ -132,6 +147,9 @@ def _annotate_in_db(entity_links: list[dict]) -> list[dict]:
     entités réellement consultables. Calculé à la lecture (jamais persisté) pour
     rester juste après un ré-import.
     """
+    # Dédoublonnage aussi à la lecture : les documents persistés avant l'ajout du
+    # dédoublonnage à l'écriture contiennent encore les deux sens de chaque relation.
+    entity_links = _dedupe_by_number(entity_links)
     numbers = list({link["number"] for link in entity_links if link.get("number")})
     if not numbers:
         return entity_links
