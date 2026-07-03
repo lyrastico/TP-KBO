@@ -15,7 +15,15 @@ export const api = createApi({
     directors: builder.query({
       query: (number) => `/enterprise/${number}/directors`,
     }),
+    links: builder.query({
+      query: (number) => `/enterprise/${number}/links`,
+    }),
   }),
 })
 
-export const { useSearchQuery, useEnterpriseQuery, useLazyDirectorsQuery } = api
+export const {
+  useSearchQuery,
+  useEnterpriseQuery,
+  useLazyDirectorsQuery,
+  useLazyLinksQuery,
+} = api

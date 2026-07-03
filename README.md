@@ -17,9 +17,12 @@ CSV KBO Open Data ─► Bronze ─► Silver ─► Ciblage hôtellerie ─► 
 - **Gold** (`hotel_gold`) : un document par entreprise, tous les exercices dans `years`
   avec postes comptables (parsés depuis les CSV PCMN) et **ratios** (marge nette, ROE,
   liquidité, taux d'endettement). Voir « Couche Gold » plus bas.
-- **API FastAPI** : recherche entreprise, fiche (Silver + Gold), dirigeants (kbopub).
-- **Frontend React** (Vite + Redux Toolkit) : recherche, fiche avec **Sankey** du compte
-  de résultat et tableau de ratios par année.
+- **API FastAPI** : recherche entreprise, fiche (Silver + Gold), dirigeants et liens
+  entre entités (kbopub).
+- **Frontend React** (Vite + Redux Toolkit) : recherche et **fiche complète** — identité,
+  contacts, établissements, **graphe CA / résultat net**, **Sankey** du compte de résultat,
+  ratios par année, comptes annuels déposés, dirigeants, liens entre entités et documents
+  officiels (Moniteur belge, statuts, comptes annuels BNB).
 
 - **Bronze** (`enterprise_finale`) : ingestion brute des CSV KBO, un document par
   entreprise avec ses enfants imbriqués (dénominations, adresses, activités, contacts,
@@ -241,12 +244,24 @@ uvicorn kbo.api:app --reload --port 8000
 |---|---|
 | `GET /api/health` | sonde MongoDB |
 | `GET /api/search?q=&limit=` | recherche par **nom** (index texte) ou **numéro BCE** (préfixe) |
-| `GET /api/enterprise/{number}` | fiche : identité + activités (Silver) et exercices/ratios (Gold) |
+| `GET /api/enterprise/{number}` | fiche : identité + activités + contacts + établissements (Silver) et exercices/ratios (Gold) |
 | `GET /api/enterprise/{number}/directors` | dirigeants via **kbopub**, scrapés une fois puis persistés (`directors`) |
+| `GET /api/enterprise/{number}/links` | liens entre entités (kbopub, persistés `entity_links`) + liens externes officiels |
 
 > La recherche par nom s'appuie sur un index texte MongoDB sur `name` : l'API le crée
 > **automatiquement au démarrage** (idempotent, ≈ 30 s une fois sur base fraîche).
 > Le SSE des statuts notaire (via Tor) est laissé de côté : l'énoncé autorise à l'ignorer.
+
+**Liens (`/links`).** Deux natures, un seul endpoint :
+> - **Liens entre entités** (fusions, absorptions, relations) : *scrapés* depuis la section
+>   « Liens entre entités » de kbopub et persistés dans `entity_links`. Chaque lien porte un
+>   drapeau `in_db` — recalculé à chaque lecture — indiquant si l'entité liée existe dans la
+>   couche Silver (le frontend rend alors un lien interne, sinon un lien externe vers kbopub).
+>   Beaucoup d'entités liées ont été **absorbées puis radiées** du registre BCE : elles
+>   n'apparaissent pas dans l'export KBO Open Data, d'où le repli vers kbopub.
+> - **Liens externes** : URLs *déterministes* construites depuis le numéro BCE — Publications
+>   au Moniteur belge, comptes annuels BNB, statuts et actes notariés, répertoire des
+>   employeurs. Aucun scraping, ce sont les « documents juridiques » et « publications ».
 
 ## Frontend React
 
@@ -256,9 +271,22 @@ npm install
 npm run dev        # http://localhost:5173 (proxifie /api vers :8000)
 ```
 
-React + **Vite** + **Redux Toolkit** (RTK Query). Recherche temps réel, fiche entreprise
-avec **Sankey** du compte de résultat (CA → marge brute → résultat net, sélecteur
-d'exercice), tableau des ratios par année et chargement des dirigeants à la demande.
+React + **Vite** + **Redux Toolkit** (RTK Query). Recherche temps réel et fiche entreprise
+détaillée :
+
+- **Identité** : forme juridique, statut, date de création, adresse du siège, activités NACE.
+- **Informations de contact** (e-mail / web / téléphone) et **établissements** (unités KBO),
+  issus de la couche Silver — bloc masqué s'il n'y a rien.
+- **Graphe CA / résultat net** : barres groupées par exercice (2021→2025, ou depuis la
+  création), échelle € commune, pertes sous la ligne du zéro.
+- **Sankey** du compte de résultat (CA → marge brute → résultat net, sélecteur d'exercice)
+  et **tableau des ratios** par année.
+- **Comptes annuels déposés** (NBB) : exercice, schéma, référence, lien vers la BNB.
+- **Dirigeants**, **liens entre entités** (cliquables si consultables en base, sinon lien
+  kbopub) et **documents officiels**, chargés à la demande depuis kbopub.
+
+Les blocs Silver/Gold ne nécessitent aucun appel supplémentaire (déjà dans la réponse
+`/enterprise/{number}`) ; dirigeants et liens sont chargés à la demande via un bouton.
 
 ## Chantier 4 — DAG Airflow (recalcul annuel incrémental)
 
@@ -288,8 +316,9 @@ cd backend && python -m kbo refresh   # nouveaux dépôts NBB -> recalcul Gold c
 │   │   ├── nbb.py            #     scraping NBB CBSO
 │   │   ├── gold.py           #     comptes annuels PCMN -> ratios -> hotel_gold
 │   │   ├── directors.py      #     dirigeants via kbopub (persistés)
+│   │   ├── links.py          #     liens entre entités (kbopub) + liens externes officiels
 │   │   ├── incremental.py    #     recalcul incrémental (support du DAG)
-│   │   ├── api.py            #     API FastAPI (recherche, fiche, dirigeants)
+│   │   ├── api.py            #     API FastAPI (recherche, fiche, dirigeants, liens)
 │   │   └── cli.py            #     point d'entrée `python -m kbo`
 │   ├── dags/                 #   DAG Airflow (recalcul annuel)
 │   │   └── kbo_gold_refresh.py

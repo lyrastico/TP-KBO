@@ -144,3 +144,14 @@ def enterprise_directors(number: str) -> dict:
         return directors_module.get_or_scrape(number)
     except requests.RequestException as exc:
         raise HTTPException(status_code=502, detail=f"kbopub injoignable : {exc}") from exc
+
+
+@app.get("/api/enterprise/{number}/links")
+def enterprise_links(number: str) -> dict:
+    """Liens entre entités (kbopub, persistés) + liens externes officiels (URLs)."""
+    from . import links as links_module
+    number = _normalize_bce(number)
+    try:
+        return links_module.get_or_scrape(number)
+    except requests.RequestException as exc:
+        raise HTTPException(status_code=502, detail=f"kbopub injoignable : {exc}") from exc

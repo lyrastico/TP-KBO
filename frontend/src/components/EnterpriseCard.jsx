@@ -1,10 +1,18 @@
 import { useEffect, useState } from 'react'
+import { useDispatch } from 'react-redux'
 import { useEnterpriseQuery } from '../api'
+import { selectEnterprise } from '../uiSlice'
 import RatiosTable from './RatiosTable'
+import RevenueChart from './RevenueChart'
 import Sankey from './Sankey'
 import Directors from './Directors'
+import Contacts from './Contacts'
+import Establishments from './Establishments'
+import AnnualAccounts from './AnnualAccounts'
+import Links from './Links'
 
 export default function EnterpriseCard({ number }) {
+  const dispatch = useDispatch()
   const { data, isFetching, isError } = useEnterpriseQuery(number)
   const years = data?.gold?.years || []
   const [selectedYear, setSelectedYear] = useState(null)
@@ -29,6 +37,7 @@ export default function EnterpriseCard({ number }) {
           <span className="tag">{s.JuridicalFormLabel}</span>
           <span className={`tag ${s.StatusLabel === 'Actif' ? 'ok' : ''}`}>{s.StatusLabel}</span>
           <span className="tag ghost">{number}</span>
+          {s.StartDate && <span className="tag ghost">créée le {s.StartDate}</span>}
         </div>
         {addr && (
           <p className="addr">
@@ -50,8 +59,15 @@ export default function EnterpriseCard({ number }) {
         </ul>
       </section>
 
+      <Contacts contacts={s.contacts} />
+
       {data.gold ? (
         <>
+          <section className="card">
+            <h3>Chiffre d'affaires & résultat net</h3>
+            <RevenueChart years={years} />
+          </section>
+
           <section className="card">
             <div className="card-head">
               <h3>Compte de résultat (Sankey)</h3>
@@ -68,12 +84,18 @@ export default function EnterpriseCard({ number }) {
             <h3>Ratios financiers par année <span className="tag ghost">{data.gold.schema_type}</span></h3>
             <RatiosTable years={years} />
           </section>
+
+          <AnnualAccounts number={number} years={years} />
         </>
       ) : (
         <section className="card">
           <p className="muted">Aucun compte annuel NBB pour cette entreprise (couche Gold vide).</p>
         </section>
       )}
+
+      <Establishments establishments={s.establishments} />
+
+      <Links number={number} onSelect={(n) => dispatch(selectEnterprise(n))} />
 
       <Directors number={number} />
     </div>

@@ -32,6 +32,7 @@ SILVER_COLLECTION = _get("SILVER_COLLECTION", "enterprise_silver")
 STATE_COLLECTION = _get("STATE_COLLECTION", "state_nbb")
 GOLD_COLLECTION = _get("GOLD_COLLECTION", "hotel_gold")
 DIRECTORS_COLLECTION = _get("DIRECTORS_COLLECTION", "directors")
+LINKS_COLLECTION = _get("LINKS_COLLECTION", "entity_links")
 
 # --- Données KBO -----------------------------------------------------------
 KBO_DIR = _resolve(_get("KBO_DIR", "data/KBO"))

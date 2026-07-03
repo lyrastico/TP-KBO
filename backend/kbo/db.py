@@ -39,6 +39,10 @@ def directors() -> Collection:
     return database()[config.DIRECTORS_COLLECTION]
 
 
+def entity_links() -> Collection:
+    return database()[config.LINKS_COLLECTION]
+
+
 def ping() -> bool:
     """Vérifie que MongoDB répond."""
     client().admin.command("ping")

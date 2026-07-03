@@ -108,6 +108,50 @@ table.ratios tr.ratio-strong td { font-weight: 700; background: #fafcff; }
 .dir-fn { font-weight: 600; color: var(--brand-ink); }
 .dir-since { color: var(--muted); font-size: 12px; }
 
+.btn.ghost { background: #fff; color: var(--brand-ink); border-color: var(--line); }
+.btn.ghost:hover { background: #f8fafc; }
+
+/* --- Contacts --- */
+.contacts { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.contacts li { display: grid; grid-template-columns: 24px 90px 1fr; align-items: center; gap: 10px; font-size: 14px; }
+.contact-ico { text-align: center; }
+.contact-type { color: var(--muted); font-size: 12px; font-weight: 600; }
+.contacts a { color: var(--brand); text-decoration: none; word-break: break-all; }
+.contacts a:hover { text-decoration: underline; }
+
+/* --- Establishments --- */
+.establishments { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.establishments li { display: flex; align-items: baseline; gap: 12px; font-size: 14px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.etab-num { font-family: ui-monospace, monospace; color: var(--brand); text-decoration: none; }
+.etab-num:hover { text-decoration: underline; }
+.etab-date { font-size: 12px; }
+
+/* --- Annual accounts --- */
+table.accounts { border-collapse: collapse; width: 100%; font-size: 13px; }
+table.accounts th, table.accounts td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
+table.accounts thead th { color: var(--muted); font-weight: 600; }
+
+/* --- Revenue chart --- */
+.revchart .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+.revchart .legend .sw { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: middle; }
+.chart-tick { font-size: 10px; fill: var(--muted); }
+.chart-year { font-size: 12px; font-weight: 600; fill: var(--ink); }
+
+/* --- Entity & external links --- */
+.entity-links { list-style: none; margin: 0 0 6px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.entity-links li { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; font-size: 14px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.link-num { font-family: ui-monospace, monospace; color: var(--brand); background: none; border: none; padding: 0; cursor: pointer; font-size: 13px; }
+.link-num:hover { text-decoration: underline; }
+.link-num.ext { color: var(--muted); text-decoration: none; }
+.link-num.ext:hover { text-decoration: underline; }
+.link-name { font-weight: 600; }
+.link-rel { font-size: 12px; }
+.ext-groups { display: flex; flex-wrap: wrap; gap: 24px; margin-top: 14px; }
+.ext-group h4 { margin: 0 0 6px; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.ext-links { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.ext-links a { color: var(--brand); text-decoration: none; font-size: 13px; }
+.ext-links a:hover { text-decoration: underline; }
+
 /* --- Misc --- */
 .muted { color: var(--muted); }
 .pad { padding: 16px; }
